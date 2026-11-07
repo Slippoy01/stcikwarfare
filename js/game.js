@@ -2855,11 +2855,14 @@ class StickenadeGame {
         if (this.mode === 'BOT') {
             if (this.enemyStickman) {
                 this.enemyStickman.update(dt);
+                this.enemyStickman.updateNameTagScale(this.camera);
             }
         } else {
             for (let [_, opp] of this.opponents) {
                 if (opp.stickman) {
                     opp.stickman.update(dt);
+                    // Distance-adaptive name tag (big & readable when far, smaller when close)
+                    opp.stickman.updateNameTagScale(this.camera);
                 }
             }
         }

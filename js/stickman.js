@@ -322,9 +322,14 @@ class TacticalStickman {
     }
 
     createNameTag() {
+        // Canvas layout (512 x 176): name (top) + health bar (middle) + ▼ locator arrow (bottom)
+        this.TAG_W = 512;
+        this.TAG_H = 176;
+        this.TAG_INFO_H = 128; // Height of the name + health bar region (reference for scaling)
+
         const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 128;
+        canvas.width = this.TAG_W;
+        canvas.height = this.TAG_H;
         this.tagCanvas = canvas;
         this.tagCtx = canvas.getContext('2d');
         this.tagTexture = new THREE.CanvasTexture(canvas);
@@ -336,7 +341,8 @@ class TacticalStickman {
         });
         this.nameTag = new THREE.Sprite(tagMat);
         this.nameTag.position.y = 2.45;
-        this.nameTag.scale.set(2.6, 0.65, 1.0);
+        this.nameTag.scale.set(2.6, 2.6 * (this.TAG_H / this.TAG_W), 1.0);
+        this.nameTag.renderOrder = 999; // Always drawn on top of world geometry
         this.root.add(this.nameTag);
 
         this.updateNameTag();
@@ -345,7 +351,7 @@ class TacticalStickman {
     updateNameTag() {
         if (!this.tagCtx) return;
         const ctx = this.tagCtx;
-        ctx.clearRect(0, 0, 512, 128);
+        ctx.clearRect(0, 0, this.TAG_W, this.TAG_H);
 
         const displayName = this.isImmune ? `🛡️ ${this.name || 'PLAYER'}` : (this.name || 'PLAYER');
 
@@ -388,7 +394,62 @@ class TacticalStickman {
         ctx.lineWidth = 2;
         ctx.strokeRect(barX, barY, barWidth, barHeight);
 
+        // 3. ▼ Locator Arrow (player slot color with dark outline) pointing down at the character
+        const arrowCX = this.TAG_W / 2;
+        const arrowTop = 112;
+        const arrowBottom = 164;
+        const arrowHalfW = 24;
+        const slotHex = '#' + (this.visorColor >>> 0).toString(16).padStart(6, '0').slice(-6);
+
+        ctx.beginPath();
+        ctx.moveTo(arrowCX - arrowHalfW, arrowTop);
+        ctx.lineTo(arrowCX + arrowHalfW, arrowTop);
+        ctx.lineTo(arrowCX, arrowBottom);
+        ctx.closePath();
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
+        ctx.lineWidth = 8;
+        ctx.stroke();
+        ctx.fillStyle = slotHex;
+        ctx.fill();
+
         this.tagTexture.needsUpdate = true;
+    }
+
+    /**
+     * Distance-Adaptive Name Tag Scaling (Auto Zoom In / Out)
+     * Keeps the overhead name tag readable from far away (larger on screen) and
+     * proportionally smaller as the viewer gets closer, so it never blocks the view.
+     * Pure transform math: no canvas redraw, no network traffic, no extra draw calls.
+     */
+    updateNameTagScale(camera) {
+        if (!this.nameTag || !camera || !this.nameTag.visible || this.isDead) return;
+
+        const NEAR_DIST = 4.0;      // At or closer than this: smallest on-screen size
+        const FAR_DIST = 50.0;      // At or farther than this: largest on-screen size
+        const NEAR_SCREEN = 0.045;  // Tag height as a fraction of screen height (near)
+        const FAR_SCREEN = 0.10;    // Tag height as a fraction of screen height (far)
+        const HEAD_TOP_Y = 1.75;    // Approx. top of helmet in local space
+
+        const dist = Math.max(0.5, camera.position.distanceTo(this.root.position));
+
+        // Smoothstep blend between near & far on-screen sizes
+        let t = (dist - NEAR_DIST) / (FAR_DIST - NEAR_DIST);
+        t = Math.max(0, Math.min(1, t));
+        t = t * t * (3 - 2 * t);
+        const screenFrac = NEAR_SCREEN + (FAR_SCREEN - NEAR_SCREEN) * t;
+
+        // Convert desired on-screen fraction into world-space height (FOV aware, works with ADS zoom)
+        // screenFrac refers to the name + health bar region; the full sprite also includes the ▼ arrow
+        const fovRad = THREE.MathUtils.degToRad(camera.fov || 75);
+        const infoH = screenFrac * 2 * dist * Math.tan(fovRad / 2);
+        const worldH = infoH * (this.TAG_H / this.TAG_INFO_H);
+
+        // Preserve canvas aspect ratio (512 x 176)
+        this.nameTag.scale.set(worldH * (this.TAG_W / this.TAG_H), worldH, 1.0);
+
+        // Lift the tag so the arrow tip always sits just above the head
+        this.nameTag.position.y = HEAD_TOP_Y + 0.08 + worldH * 0.5;
     }
 
     setHealth(hp) {
