@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>stickenade | Pure Code 1v1 FPS Grenade Launcher</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💣</text></svg>">
+    <link rel="stylesheet" href="css/style.css?v=15">
+
+    <!-- Three.js with CDN fallback -->
+    <script src="js/three.min.js"></script>
+    <script>
+        if (typeof THREE === 'undefined') {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');
+        }
+    </script>
+    <!-- PeerJS for Realtime WebRTC P2P Multiplayer (Zero Server Cost) - Same as stickken -->
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script>
+        if (typeof Peer === 'undefined') {
+            document.write('<script src="js/peerjs.min.js"><\/script>');
+        }
+    </script>
+</head>
+<body>
+    <!-- Orientation Reminder for Mobile -->
+    <div id="orientation-banner">📱 Putar HP ke posisi Landscape (layar miring) untuk pandangan FPS yang lebih luas!</div>
+
+    <!-- 3D WebGL Canvas Container -->
+    <div id="game-container"></div>
+
+    <!-- Damage Red Vignette Overlay -->
+    <div id="damage-vignette"></div>
+
+    <!-- Respawn Invincibility Shield Cyan Vignette Overlay -->
+    <div id="shield-vignette"></div>
+
+    <!-- Tactical Sniper Scope Optical Overlay (ADS Fullscreen Optic) -->
+    <div id="sniper-scope-overlay" style="display: none;">
+        <div class="scope-lens-vignette"></div>
+        <div class="scope-crosshair-center"></div>
+        <div class="scope-line scope-line-h"></div>
+        <div class="scope-line scope-line-v"></div>
+        <div class="scope-mildots-h">
+            <span class="mildot"></span><span class="mildot"></span><span class="mildot"></span><span class="mildot"></span>
+            <span class="mildot"></span><span class="mildot"></span><span class="mildot"></span><span class="mildot"></span>
+        </div>
+        <div class="scope-mildots-v">
+            <span class="mildot"></span><span class="mildot"></span><span class="mildot"></span><span class="mildot"></span>
+            <span class="mildot"></span><span class="mildot"></span><span class="mildot"></span><span class="mildot"></span>
+        </div>
+        <div class="scope-circle-inner"></div>
+        <div class="scope-circle-outer"></div>
+        <div class="scope-hud-data top-left">CAL: .50 BMG</div>
+        <div class="scope-hud-data top-right">MAG: 4.1X OPTIC</div>
+        <div class="scope-hud-data bottom-left">ELEV: 0.00 MIL</div>
+        <div class="scope-hud-data bottom-right">WIND: 0.0 MPH</div>
+        <div class="scope-rangefinder">
+            <div class="rf-bar rf-1"></div>
+            <div class="rf-bar rf-2"></div>
+            <div class="rf-bar rf-3"></div>
+            <span class="rf-label">STADIA 100-300M</span>
+        </div>
+    </div>
+
+    <!-- 3D Floating Combat Damage Numbers -->
+    <div id="combat-text-container"></div>
+
+    <!-- Gamepad Floating Toast Notification -->
+    <div id="gamepad-toast">
+        <span id="gamepad-toast-icon">🎮</span>
+        <span id="gamepad-toast-msg">Gamepad Connected</span>
+    </div>
+
+    <!-- Top Action Bar -->
+    <div class="top-actions">
+        <button id="btn-menu" class="icon-btn" title="Menu Utama">🏠 Menu</button>
+        <button id="btn-audio" class="icon-btn" title="Toggle Sound">🔊 SFX</button>
+        <button id="btn-music" class="icon-btn" title="Toggle Music">🎵 Musik</button>
+        <button id="btn-lobby" class="icon-btn" title="1v1 Lobby / Multiplayer">⚔️ Mode 1v1</button>
+        
+        <!-- Gamepad Status Pill -->
+        <div id="gamepad-badge-status" class="gamepad-status-pill disconnected" title="Klik untuk Bantuan Kontrol Gamepad">
+            <span class="status-dot"></span>
+            <span id="gamepad-status-text">🎮 Gamepad</span>
+        </div>
+
+        <button id="btn-touch-toggle" class="icon-btn" title="Toggle Mobile Controls">📱 Touch</button>
+        <button id="btn-fullscreen" class="icon-btn" title="Fullscreen">⛶ Full</button>
+    </div>
+
+    <!-- Online Status Pill -->
+    <div id="online-status-pill" class="online-pill" style="display: none;">
+        <span class="live-dot"></span>
+        <span id="online-role-label">1v1 ONLINE</span>
+        <span>•</span>
+        <span id="online-room-code">ROOM: ----</span>
+        <span>•</span>
+        <span id="online-ping-display">📶 --ms</span>
+    </div>
+
+    <!-- Top Match Scoreboard with 3-Minute Timer -->
+    <div id="top-scoreboard">
+        <div class="score-side hero">
+            <span id="score-hero-name" class="score-name">HERO (KAMU)</span>
+            <span id="score-player" class="score-num">0</span>
+        </div>
+        <div class="score-center">
+            <div id="match-timer" class="match-timer">03:00</div>
+            <span class="score-vs">VS</span>
+        </div>
+        <div class="score-side enemy">
+            <span id="score-enemy-name" class="score-name">BOT-OMEGA</span>
+            <span id="score-enemy" class="score-num">0</span>
+        </div>
+    </div>
+
+    <!-- EDF Co-op Alien Defense HUD -->
+    <div id="edf-wave-hud" style="display: none;">
+        <!-- Top Wave & Swarm Tracker Bar -->
+        <div class="edf-top-bar">
+            <div class="edf-wave-badge">
+                <span class="edf-logo-icon">🐜</span>
+                <span id="edf-wave-number" class="edf-wave-title">WAVE 1 / 20</span>
+            </div>
+            <div id="edf-swarm-status" class="edf-swarm-badge">
+                🐜 SWARM: <strong>0</strong> ALIEN TERSISA
+            </div>
+            <div class="edf-zones-cluster">
+                <div id="hud-medbay-badge" class="zone-pill medbay">➕ MED-BAY (ISI DARAH)</div>
+                <div id="hud-ammo-depot-badge" class="zone-pill ammo-depot">🔒 AMMO DEPOT: 02:00</div>
+            </div>
+        </div>
+
+        <!-- Boss Status Card (Appears during Boss Phase) -->
+        <div id="edf-boss-card" class="edf-boss-hud" style="display: none;">
+            <div class="boss-info-row">
+                <span class="boss-skull">💀</span>
+                <span id="edf-boss-name" class="boss-name">BOSS NAME</span>
+                <span id="edf-boss-weakness" class="boss-weakness-badge">🔥 LEMAH: FLAME (3x DMG!)</span>
+                <span id="edf-boss-hp-text" class="boss-hp-text">1000 / 1000 HP</span>
+            </div>
+            <div class="boss-hp-track">
+                <div id="edf-boss-hp-fill" class="boss-hp-fill"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Killfeed -->
+    <div id="killfeed-container"></div>
+
+    <!-- Dynamic Crosshair & Hitmarker -->
+    <div id="crosshair-container">
+        <div class="crosshair-center"></div>
+        <div class="crosshair-line top"></div>
+        <div class="crosshair-line bottom"></div>
+        <div class="crosshair-line left"></div>
+        <div class="crosshair-line right"></div>
+        <!-- Hitmarker X -->
+        <div id="hitmarker"></div>
+    </div>
+
+    <!-- Bottom Tactical HUD (Health & Revolving Cylinder) -->
+    <div id="bottom-hud">
+        <!-- EDF Multi-Weapon Loadout Bar (Hotkeys 1 - 5) -->
+        <div id="edf-loadout-bar" class="edf-loadout-container" style="display: none;"></div>
+
+        <!-- Respawn Invincibility Shield Status Pill -->
+        <div id="hud-shield-indicator" class="shield-indicator-pill" style="display: none;">
+            <span class="shield-icon">🛡️</span>
+            <span class="shield-text">KEBAL RESPAWN: <strong id="hud-shield-timer">3.5s</strong></span>
+        </div>
+
+        <!-- Health Bar -->
+        <div class="health-hud-card">
+            <div class="health-meta">
+                <span class="health-label">VITAL STATUS</span>
+                <span id="hud-health-val">100</span>
+            </div>
+            <div id="hud-health-bar">
+                <div id="hud-health-fill"></div>
+            </div>
+        </div>
+
+        <!-- Weapon Ammo HUD Card (Cylinder Drum or Sniper Box Magazine) -->
+        <div class="ammo-hud-card">
+            <!-- 6-Chamber Grenade Drum -->
+            <div class="cylinder-dial">
+                <div class="cylinder-chamber chamber-0 loaded"></div>
+                <div class="cylinder-chamber chamber-1 loaded"></div>
+                <div class="cylinder-chamber chamber-2 loaded"></div>
+                <div class="cylinder-chamber chamber-3 loaded"></div>
+                <div class="cylinder-chamber chamber-4 loaded"></div>
+                <div class="cylinder-chamber chamber-5 loaded"></div>
+            </div>
+            <!-- 5-Round Sniper Magazine -->
+            <div class="sniper-mag-display" style="display: none;">
+                <div class="sniper-bullet-pip pip-0 loaded"></div>
+                <div class="sniper-bullet-pip pip-1 loaded"></div>
+                <div class="sniper-bullet-pip pip-2 loaded"></div>
+                <div class="sniper-bullet-pip pip-3 loaded"></div>
+                <div class="sniper-bullet-pip pip-4 loaded"></div>
+            </div>
+            <div class="ammo-info">
+                <span class="ammo-label">40MM GRENADE</span>
+                <span id="hud-ammo-val">6 / 6</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pointer Lock Prompt / Tap to Start Overlay -->
+    <div id="pointer-lock-prompt">
+        <div class="prompt-box">
+            <h3 id="prompt-title">🎮 KLIK UNTUK MASUK MODE FPS</h3>
+            <div id="prompt-pc-desc">
+                <p><strong>W, A, S, D</strong> : Gerak &nbsp;|&nbsp; <strong>Shift</strong> : Sprint &nbsp;|&nbsp; <strong>Spasi</strong> : Lompat</p>
+                <p><strong>Klik Kiri</strong> : Tembak &nbsp;|&nbsp; <strong>Klik Kanan</strong> : Keker (ADS) &nbsp;|&nbsp; <strong>R</strong> : Reload</p>
+                <div class="prompt-sens-control">
+                    <div class="prompt-sens-meta">
+                        <span>🎯 Sensitivitas Mouse (PC):</span>
+                        <strong id="prompt-sens-display">1.0x</strong>
+                    </div>
+                    <input type="range" id="prompt-mouse-sens" class="range-slider" min="0.2" max="3.0" step="0.1" value="1.0">
+                </div>
+            </div>
+            <div id="prompt-mobile-desc" style="display: none;">
+                <p>Jempol Kiri: Virtual Joystick &nbsp;|&nbsp; Usap Kanan: Arah Bidik</p>
+                <p>Tombol Kanan: Tembak, Lompat, Keker (ADS), & Reload</p>
+            </div>
+            <p style="margin-top: 8px; color: #00f0ff;"><em>💡 Tips: Kamu kebal tembakan selama 3.5 detik setiap kali respawn!</em></p>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="game-toast"></div>
+
+    <!-- Start / Main Menu Screen Modal (Identical UX & Layout to Stickken) -->
+    <div id="start-screen" class="modal-overlay">
+        <div class="menu-card">
+            <h1 class="game-title">STICKENADE 3D</h1>
+            <div class="game-subtitle">100% Procedural FPS Grenade Launcher Duel</div>
+            <div class="match-rules-banner">
+                ⏱️ <strong>Format Pertandingan:</strong> 3 Menit Eliminasi • Skor Terbanyak Menang • ⚠️ <em>Bunuh diri / granat sendiri <strong>-1 Poin</strong></em>
+            </div>
+
+            <div class="options-grid">
+                <div class="option-group" id="group-player-name">
+                    <label for="input-player-name">Nama Karakter (Nickname)</label>
+                    <input type="text" id="input-player-name" class="select-control" maxlength="15" placeholder="Masukkan nickname kamu..." value="HERO" style="text-align: left; padding: 0 12px; font-weight: bold; color: #00f0ff; background: rgba(22, 30, 52, 0.85); border: 1px solid rgba(0, 240, 255, 0.35); border-radius: 8px; height: 42px; width: 100%; box-sizing: border-box;">
+                </div>
+
+                <div class="option-group">
+                    <label for="select-mode">Game Mode</label>
+                    <select id="select-mode" class="select-control">
+                        <option value="EDF_SOLO" selected style="color: #ffaa00; font-weight: bold;">🐜 Alien Swarm Defense (EDF Solo Mode)</option>
+                        <option value="ONLINE_EDF" style="color: #ffaa00; font-weight: bold;">🐜 Online EDF Co-op (2 - 4 Players P2P)</option>
+                        <option value="DUEL_AI">🤖 1P vs AI Bot (Solo Practice)</option>
+                        <option value="ONLINE_PVP" style="color: #00f0ff; font-weight: bold;">🌐 Online 1v1 Duel (WebRTC P2P)</option>
+                    </select>
+                </div>
+
+                <div class="option-group" id="group-difficulty" style="display: none;">
+                    <label for="select-difficulty">AI Difficulty</label>
+                    <select id="select-difficulty" class="select-control">
+                        <option value="easy">Easy (Rookie)</option>
+                        <option value="normal" selected>Normal (Veteran)</option>
+                        <option value="brutal">Brutal (Cyber Commando)</option>
+                    </select>
+                </div>
+
+                <div class="option-group" id="group-weapon" style="display: none;">
+                    <label for="select-weapon">Mode Senjata (Weapon)</label>
+                    <select id="select-weapon" class="select-control">
+                        <option value="GRENADE" selected>💣 Granat 40mm (Explosive &amp; Rocket Jump)</option>
+                        <option value="SNIPER" style="color: #00f0ff; font-weight: bold;">🎯 Sniper .50 Cal (One-Shot Scope Duel)</option>
+                    </select>
+                </div>
+
+                <div class="option-group" id="group-mouse-sens">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <label for="select-mouse-sens" style="margin-bottom: 0;">Mouse Sens (PC)</label>
+                        <span id="mouse-sens-display" style="font-size: 11px; font-weight: 900; color: #00f0ff; font-family: monospace;">1.0x</span>
+                    </div>
+                    <div class="slider-box" style="display: flex; align-items: center; gap: 8px; background: rgba(22, 30, 52, 0.85); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; padding: 10px 12px; height: 42px; box-sizing: border-box;">
+                        <input type="range" id="select-mouse-sens" class="range-slider" min="0.2" max="3.0" step="0.1" value="1.0">
+                    </div>
+                </div>
+
+                <div class="option-group">
+                    <label for="select-arena">Battlefield Arena</label>
+                    <select id="select-arena" class="select-control">
+                        <option value="edf" selected>🛡️ EDF Outpost "Aegis" (Fortified Battlefield • Watchtowers, Bunkers & Jump Pads)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- EDF Mode Details Banner (Shows when EDF is active) -->
+            <div id="edf-mode-banner" class="edf-menu-card" style="display: block; margin: 12px 0 16px 0; text-align: left; background: rgba(255, 170, 0, 0.08); border: 1px solid rgba(255, 170, 0, 0.35); border-radius: 10px; padding: 12px 16px; font-size: 12px; color: #e2e8f0; line-height: 1.55;">
+                <div style="font-weight: 900; color: #ffaa00; font-size: 13px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                    <span>🐜</span> <span>EARTH DEFENSE FORCE (EDF) ALIEN SWARM BRIEFING</span>
+                </div>
+                <div>• <strong>20 Waves Survival:</strong> Menghadapi semut merah, semut hitam asam, laba-laba, tawon plasma, kumbang zirah &amp; 20 bos unik!</div>
+                <div>• <strong>1000 HP per Pemain:</strong> Isi darah di <strong>Area Med-Bay</strong> (+50 HP/detik, <em>senjata dikunci saat di dalam!</em>)</div>
+                <div>• <strong>Assault Rifle:</strong> 35 peluru reload (Tekan <span class="key-tag" style="font-size: 10px; padding: 1px 4px;">R</span>), amunisi cadangan <strong>tak terbatas (∞)</strong>!</div>
+                <div>• <strong>4 Senjata Spesial:</strong> 🔥 Flame, ⚡ Laser, 🚀 Bazooka, 🎯 Sniper. Bos memiliki tanda kelemahan untuk <strong>3x Critical Damage</strong>!</div>
+                <div>• <strong>Special Ammo Depot:</strong> Buka tiap <strong>2 menit</strong> (durasi 30s) untuk isi penuh amunisi senjata spesial!</div>
+                <div>• <strong>Solo Mode:</strong> Membawa sekaligus <strong>ke-4 senjata spesial</strong>! Ganti dengan tombol <span class="key-tag" style="font-size: 10px; padding: 1px 4px;">1</span> - <span class="key-tag" style="font-size: 10px; padding: 1px 4px;">5</span> atau Scroll Wheel!</div>
+            </div>
+
+            <button id="btn-start-fight" class="btn-primary" style="background: linear-gradient(135deg, #ffaa00, #ff5500); color: #000; font-weight: 900;">MULAI MISI EDF (20 WAVE)</button>
+
+            <!-- Controls Guide Section (Keyboard, Gamepad & Touch Tabs) -->
+            <div class="controls-guide-wrapper">
+                <div class="controls-tabs">
+                    <button type="button" class="ctrl-tab-btn active" id="tab-keyboard">⌨️ Keyboard</button>
+                    <button type="button" class="ctrl-tab-btn" id="tab-gamepad">🎮 Gamepad</button>
+                    <button type="button" class="ctrl-tab-btn" id="tab-touch">📱 Layar Sentuh / HP</button>
+                </div>
+
+                <!-- Keyboard Guide Pane -->
+                <div id="guide-pane-keyboard" class="guide-pane active">
+                    <div class="guide-title">⌨️ Kontrol Keyboard &amp; Mouse (PC / Laptop)</div>
+                    <div class="guide-row"><span class="key-tag">W</span> <span class="key-tag">A</span> <span class="key-tag">S</span> <span class="key-tag">D</span> <span class="guide-action">Gerak Maju, Kiri, Mundur, Kanan</span></div>
+                    <div class="guide-row"><span class="key-tag">1</span> - <span class="key-tag">5</span> / <span class="key-tag">Scroll</span> / <span class="key-tag">Q</span> <span class="key-tag">E</span> <span class="guide-action">Ganti Senjata (AR, Flamethrower, Laser, Bazooka, Sniper)</span></div>
+                    <div class="guide-row"><span class="key-tag">Shift</span> <span class="guide-action">Sprint (Lari Cepat)</span></div>
+                    <div class="guide-row"><span class="key-tag">Spasi</span> <span class="guide-action">Lompat (Rocket Jump di mode Bazooka/Granat!)</span></div>
+                    <div class="guide-row"><span class="key-tag">C</span> / <span class="key-tag">Ctrl</span> <span class="guide-action">Jongkok / Duck (Berlindung)</span></div>
+                    <div class="guide-row"><span class="key-tag">Klik Kiri</span> <span class="guide-action">Menembak Senjata Aktif</span></div>
+                    <div class="guide-row"><span class="key-tag">Klik Kanan</span> <span class="guide-action">Aim Down Sights (ADS / Keker Scope Pembesar Tinggi)</span></div>
+                    <div class="guide-row"><span class="key-tag">R</span> <span class="guide-action">Isi Ulang (Reload Assault Rifle / Senjata)</span></div>
+                    <div class="guide-row"><span class="key-tag">P</span> / <span class="key-tag">Esc</span> <span class="guide-action">Jeda / Keluar Cursor Lock</span></div>
+                    <div class="guide-row"><span class="key-tag">Sens</span> <span class="guide-action">Sensitivitas Mouse (Slider di menu &amp; layar jeda)</span></div>
+                    <div class="guide-row" style="margin-top: 6px; color: #ffaa00; font-size: 12px;">🐜 <em>EDF Mode: Bos memiliki badge kelemahan di atas kepala untuk 3x Damage!</em></div>
+                    <div class="guide-row" style="margin-top: 4px; color: #00ff88; font-size: 12px;">➕ <em>Area Med-Bay: Regenerasi +50 HP/s (Senjata terkunci saat berada di dalam!)</em></div>
+                </div>
+
+                <!-- Gamepad Guide Pane -->
+                <div id="guide-pane-gamepad" class="guide-pane">
+                    <div class="guide-title">🎮 Panduan Kontrol Gamepad (Xbox / PlayStation / Generic)</div>
+                    <div class="gamepad-grid">
+                        <div class="gamepad-row"><span class="gamepad-badge dpad">Left Stick</span> Gerak Maju, Mundur, &amp; Strafe</div>
+                        <div class="gamepad-row"><span class="gamepad-badge btn-bumper">LB / RB</span> Ganti Senjata Cepat (Slot 1-5)</div>
+                        <div class="gamepad-row"><span class="gamepad-badge btn-meta">L3</span> / <span class="gamepad-badge btn-bumper">LB</span> Sprint</div>
+                        <div class="gamepad-row"><span class="gamepad-badge dpad">Right Stick</span> Putar Pandangan &amp; Bidik (Pitch/Yaw)</div>
+                        <div class="gamepad-row"><span class="gamepad-badge btn-trigger">RT / R2</span> Tembak Senjata 💥</div>
+                        <div class="gamepad-row"><span class="gamepad-badge btn-trigger">LT / L2</span> Keker ADS / Scope Optical 🎯</div>
+                        <div class="gamepad-row"><span class="gamepad-badge btn-a">A / ✕</span> Lompat / Rocket Jump 🚀</div>
+                        <div class="gamepad-row"><span class="gamepad-badge btn-x">X / □</span> Isi Ulang (Reload) 🔄</div>
+                        <div class="gamepad-row"><span class="gamepad-badge btn-b">B / ○</span> / <span class="gamepad-badge btn-meta">R3</span> Jongkok 🛡️</div>
+                        <div class="gamepad-row"><span class="gamepad-badge btn-meta">START</span> Menu / Rematch</div>
+                    </div>
+                </div>
+
+                <!-- Touch Guide Pane -->
+                <div id="guide-pane-touch" class="guide-pane">
+                    <div class="guide-title">📱 Panduan Layar Sentuh (HP / Tablet)</div>
+                    <div class="guide-row"><span class="key-tag">Usap Kanan</span> <span class="guide-action">Touch Aim Surface (Putar &amp; Bidik)</span></div>
+                    <div class="guide-row"><span class="key-tag">Joystick Kiri</span> <span class="guide-action">Gerak Maju / Mundur / Strafe</span></div>
+                    <div class="guide-row"><span class="key-tag">💥 FIRE</span> <span class="guide-action">Tembak (Granat / Peluru Sniper)</span></div>
+                    <div class="guide-row"><span class="key-tag">🚀 JUMP</span> <span class="guide-action">Lompat / Rocket Jump</span></div>
+                    <div class="guide-row"><span class="key-tag">🎯 ADS</span> <span class="guide-action">Toggle Keker Scope / Holographic</span></div>
+                    <div class="guide-row"><span class="key-tag">🔄 RELOAD</span> <span class="guide-action">Isi Ulang Peluru</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lobby / Online Modal (1v1 Multiplayer - Same UX as Stickken) -->
+    <div id="lobby-modal" class="modal-overlay" style="display: none;">
+        <div class="menu-card">
+            <h2>💣 ONLINE MULTIPLAYER DUEL &amp; CO-OP</h2>
+            <div class="game-subtitle" style="margin-bottom: 14px;">P2P WebRTC Direct Connection • Zero Server Cost (Rp 0 Beban Server)</div>
+
+            <!-- Nickname Setting Bar in Lobby -->
+            <div class="lobby-nickname-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(0, 240, 255, 0.35); border-radius: 8px; padding: 8px 12px; margin-bottom: 14px; text-align: left;">
+                <label for="input-lobby-player-name" style="font-size: 12px; font-weight: bold; color: #00f0ff; white-space: nowrap; margin-bottom: 0;">🏷️ NICKNAME KAMU:</label>
+                <input type="text" id="input-lobby-player-name" class="input-code" maxlength="15" placeholder="Nickname..." value="HERO" style="flex: 1; height: 32px; font-size: 13px; font-weight: bold; text-transform: none; text-align: left; padding: 4px 10px; margin-bottom: 0; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.2);">
+                <button type="button" id="btn-save-nickname" class="btn-primary" style="width: auto; padding: 6px 14px; font-size: 11px; font-weight: 900; margin-bottom: 0; background: #00f0ff; color: #000;">SIMPAN</button>
+            </div>
+
+            <!-- Mode Tabs: Host vs Join -->
+            <div class="online-tabs">
+                <button type="button" class="online-tab-btn active" id="btn-tab-host">👑 BIKIN ROOM (HOST)</button>
+                <button type="button" class="online-tab-btn" id="btn-tab-join">⚔️ GABUNG ROOM</button>
+            </div>
+
+            <!-- Tab 1: Host Room Panel -->
+            <div id="panel-host" class="online-panel active">
+                <p style="color: #94a3b8; font-size: 13px; margin-bottom: 10px;">
+                    Bagikan kode atau link ini ke teman tongkrongan untuk bertarung:
+                </p>
+                <div class="room-code-display">
+                    <span class="room-code-text" id="host-room-code">----</span>
+                    <button type="button" class="btn-copy-code" id="btn-copy-room-link" title="Salin Link Mabar">
+                        📋 SALIN LINK
+                    </button>
+                </div>
+                <div class="online-status-pulse">
+                    <span class="pulse-ring"></span>
+                    <span id="host-status-msg">Menghubungkan ke Peer Server...</span>
+                </div>
+
+                <div class="option-group" style="margin-top: 14px; text-align: left;">
+                    <label for="host-select-gametype" style="color: #94a3b8; font-size: 12px; font-weight: bold; text-transform: uppercase;">MODE PERTANDINGAN (MATCH TYPE)</label>
+                    <select id="host-select-gametype" class="select-control" style="margin-top: 6px;">
+                        <option value="EDF" selected style="color: #ffaa00; font-weight: bold;">🐜 Alien Defense Co-op (EDF 20 Waves)</option>
+                        <option value="PVP">⚔️ PvP Arena Duel (EDF Outpost Aegis)</option>
+                    </select>
+                </div>
+
+                <div class="option-group" style="margin-top: 12px; text-align: left;">
+                    <label for="host-select-max-players" style="color: #94a3b8; font-size: 12px; font-weight: bold; text-transform: uppercase;">KAPASITAS ROOM (JUMLAH PEMAIN)</label>
+                    <select id="host-select-max-players" class="select-control" style="margin-top: 6px;">
+                        <option value="2" selected>👥 2 Pemain (Duo Co-op)</option>
+                        <option value="3">👥 3 Pemain (Trio Co-op)</option>
+                        <option value="4">👥 4 Pemain (Squad 4P Max)</option>
+                    </select>
+                </div>
+
+                <!-- PvP Weapon Select (Hidden in EDF mode) -->
+                <div class="option-group" id="group-host-weapon" style="margin-top: 12px; text-align: left; display: none;">
+                    <label for="host-select-weapon" style="color: #94a3b8; font-size: 12px; font-weight: bold; text-transform: uppercase;">PILIHAN SENJATA DUEL</label>
+                    <select id="host-select-weapon" class="select-control" style="margin-top: 6px;">
+                        <option value="GRENADE" selected>💣 Granat 40mm (Explosion &amp; Rocket Jump)</option>
+                        <option value="SNIPER" style="color: #00f0ff; font-weight: bold;">🎯 Sniper .50 Cal (One-Shot Headshot Scope)</option>
+                    </select>
+                </div>
+
+                <!-- EDF Weapon Quota Briefing Banner -->
+                <div id="host-edf-info-banner" style="background: rgba(255, 170, 0, 0.08); border: 1px solid rgba(255, 170, 0, 0.35); border-radius: 8px; padding: 10px 12px; margin-top: 10px; font-size: 11.5px; color: #f1f5f9; text-align: left; line-height: 1.55;">
+                    🛡️ <strong>Aturan Kuota Senjata Spesial EDF Co-op:</strong><br>
+                    • <strong>Duo (2P):</strong> Masing-masing bawa 2 senjata spesial + Assault Rifle<br>
+                    • <strong>Trio (3P):</strong> Host bawa 2 senjata spesial, pemain 2 &amp; 3 bawa 1 senjata spesial + AR<br>
+                    • <strong>4 Pemain:</strong> Masing-masing bawa 1 senjata spesial unik + AR<br>
+                    • <em>Assault Rifle tak terbatas (clip 35 reload). Med-Bay (+50 HP/s) &amp; Ammo Depot tiap 2 menit!</em>
+                </div>
+
+                <!-- Slot Pemain Terhubung -->
+                <div id="host-player-slots" class="player-slots-box"></div>
+
+                <button type="button" id="btn-host-start-match" class="btn-primary" style="margin-top: 14px; display: none; background: linear-gradient(135deg, #ffaa00, #ff5500); color: #000; font-weight: 900;">
+                    🚀 MULAI PERTANDINGAN (<span id="host-ready-count">1</span>/<span id="host-max-count">2</span>)
+                </button>
+            </div>
+
+            <!-- Tab 2: Join Room Panel -->
+            <div id="panel-join" class="online-panel">
+                <p style="color: #94a3b8; font-size: 13px; margin-bottom: 10px;">
+                    Masukkan Kode Room dari temanmu (misal: <code>GN88</code>):
+                </p>
+                <div class="join-input-group">
+                    <input type="text" id="input-room-code" class="input-code" placeholder="KODE ROOM..." maxlength="10" autocomplete="off">
+                    <button type="button" class="btn-primary" id="btn-submit-join" style="width: auto; padding: 10px 24px; margin-bottom: 0;">
+                        DUEL!
+                    </button>
+                </div>
+                <div class="online-status-pulse" id="join-status-pulse" style="display: none;">
+                    <span class="pulse-ring"></span>
+                    <span id="join-status-msg">Menghubungkan ke Host...</span>
+                </div>
+                <div id="join-player-slots" class="player-slots-box" style="display: none; margin-top: 14px;"></div>
+            </div>
+
+            <!-- Custom Signaling Server Accordion (Render.com / Cloudflare / Glitch) -->
+            <div class="server-config-section" style="margin-top: 16px; padding-top: 12px; border-top: 1px dashed rgba(255, 255, 255, 0.15); text-align: left;">
+                <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" id="toggle-server-settings">
+                    <span style="font-size: 11px; color: #94a3b8; font-weight: bold; text-transform: uppercase;">
+                        🌐 SERVER SIGNALING: <span id="current-server-label" style="color: #00f0ff;">stickenade-peerserver.onrender.com/stickenade</span>
+                    </span>
+                    <span id="server-settings-arrow" style="color: #38bdf8; font-size: 11px; font-weight: bold;">⚙️ UBAH</span>
+                </div>
+                <div id="server-settings-panel" style="display: none; margin-top: 10px; background: rgba(0, 0, 0, 0.5); padding: 12px; border-radius: 8px; border: 1px solid rgba(0, 240, 255, 0.2);">
+                    <div style="font-size: 11px; color: #94a3b8; margin-bottom: 6px;">
+                        Domain Server (misal: <code>stickenade-peerserver.onrender.com</code>):
+                    </div>
+                    <input type="text" id="input-custom-server" class="input-code" placeholder="stickenade-peerserver.onrender.com" style="width: 100%; font-size: 12px; text-transform: none; text-align: left; padding: 8px 12px; margin-bottom: 6px; box-sizing: border-box;">
+                    <div style="font-size: 11px; color: #94a3b8; margin-bottom: 6px;">
+                        Path PeerServer (default: <code>/stickenade</code>):
+                    </div>
+                    <input type="text" id="input-custom-path" class="input-code" placeholder="/stickenade" style="width: 100%; font-size: 12px; text-transform: none; text-align: left; padding: 8px 12px; margin-bottom: 10px; box-sizing: border-box;">
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" id="btn-save-server" class="btn-primary" style="flex: 1; padding: 8px; font-size: 11px; font-weight: bold; margin-bottom: 0;">✓ TERAPKAN</button>
+                        <button type="button" id="btn-reset-server" class="btn-secondary" style="flex: 1; padding: 8px; font-size: 11px; margin-bottom: 0;">↺ RESET RENDER</button>
+                    </div>
+                </div>
+            </div>
+
+            <button id="btn-close-lobby" class="btn-secondary" style="margin-top: 18px;">
+                KEMBALI KE MENU UTAMA
+            </button>
+        </div>
+    </div>
+
+    <!-- Gamepad Guide Modal -->
+    <div id="gamepad-guide-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-card">
+            <h2>🎮 PANDUAN KONTROL GAMEPAD</h2>
+            <p>Mendukung stik Xbox, PlayStation DualShock/DualSense, dan controller generik USB/Bluetooth.</p>
+
+            <div class="gamepad-grid">
+                <div class="gamepad-row">
+                    <span class="gamepad-badge dpad">Left Stick</span>
+                    <span>Gerak Maju, Mundur, & Strafe</span>
+                </div>
+                <div class="gamepad-row">
+                    <span class="gamepad-badge btn-meta">L3 (Tekan Stick Kiri)</span> / <span class="gamepad-badge btn-bumper">LB</span>
+                    <span>Sprint (Lari Cepat)</span>
+                </div>
+                <div class="gamepad-row">
+                    <span class="gamepad-badge dpad">Right Stick</span>
+                    <span>Putar Pandangan & Bidik (Pitch/Yaw)</span>
+                </div>
+                <div class="gamepad-row">
+                    <span class="gamepad-badge btn-trigger">RT / R2</span>
+                    <span><strong>Tembak Granat 40mm 💥</strong></span>
+                </div>
+                <div class="gamepad-row">
+                    <span class="gamepad-badge btn-trigger">LT / L2</span>
+                    <span><strong>Aim Down Sights (ADS / Keker) 🎯</strong></span>
+                </div>
+                <div class="gamepad-row">
+                    <span class="gamepad-badge btn-a">A / ✕</span>
+                    <span>Lompat / Rocket Jump 🚀</span>
+                </div>
+                <div class="gamepad-row">
+                    <span class="gamepad-badge btn-x">X / □</span>
+                    <span>Isi Ulang (Reload) 🔄</span>
+                </div>
+                <div class="gamepad-row">
+                    <span class="gamepad-badge btn-b">B / ○</span> / <span class="gamepad-badge btn-meta">R3</span>
+                    <span>Jongkok / Duck 🛡️</span>
+                </div>
+                <div class="gamepad-row">
+                    <span class="gamepad-badge btn-meta">START</span>
+                    <span>Menu / Rematch 🔄</span>
+                </div>
+            </div>
+
+            <div style="font-size: 12px; color: #00ff88; margin-bottom: 16px;">
+                ⚡ <em>Dilengkapi getaran haptic ganda (dual-rumble) saat menembak dan terkena ledakan!</em>
+            </div>
+
+            <button id="btn-close-gamepad-guide" class="btn-primary">Mengerti & Tutup</button>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="game-over-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-card">
+            <h2 id="game-over-title">VICTORY!</h2>
+            <p id="game-over-desc">Waktu 3 menit telah berakhir!</p>
+            <div class="game-over-score-box" id="go-duo-score-box">
+                <div class="go-score-col">
+                    <span class="go-score-lbl">SKOR KAMU</span>
+                    <span id="go-score-my" class="go-score-val">0</span>
+                </div>
+                <div class="go-score-sep">:</div>
+                <div class="go-score-col">
+                    <span id="go-enemy-lbl" class="go-score-lbl">SKOR LAWAN</span>
+                    <span id="go-score-enemy" class="go-score-val">0</span>
+                </div>
+            </div>
+            <div id="go-leaderboard" class="leaderboard-list" style="display: none;"></div>
+            <div style="display: flex; gap: 12px; width: 100%; margin-top: 18px;">
+                <button id="btn-rematch" class="btn-primary" style="flex: 1;">🔄 Main Lagi</button>
+                <button id="btn-back-to-menu" class="btn-primary" style="flex: 1; background: #222630; border-color: #444c60;">🏠 Menu</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Virtual Touch Controls -->
+    <div id="touch-controls">
+        <!-- Dynamic Floating Joystick Touch Surface on Left Side (PUBG / MLBB Style) -->
+        <div id="touch-move-surface"></div>
+
+        <!-- Touch Aim / Look Surface on Right Half of Screen -->
+        <div id="touch-look-zone"></div>
+
+        <!-- Floating Joystick Visual Base & Knob (Dynamic Repositioning) -->
+        <div id="touch-move-zone" class="touch-zone-left">
+            <div id="touch-move-knob" class="touch-knob"></div>
+        </div>
+
+        <!-- Action Buttons on Right Side Cluster -->
+        <div class="touch-zone-right">
+            <div class="touch-col">
+                <div id="touch-btn-sprint" class="touch-action-btn small-btn">⚡ SPRINT</div>
+                <div id="touch-btn-crouch" class="touch-action-btn small-btn">🛡️ DUCK</div>
+            </div>
+            <div class="touch-col">
+                <div id="touch-btn-reload" class="touch-action-btn med-btn">🔄 RELOAD</div>
+                <div id="touch-btn-ads" class="touch-action-btn med-btn">🎯 ADS</div>
+            </div>
+            <div class="touch-col">
+                <div id="touch-btn-jump" class="touch-action-btn med-btn">🚀 JUMP</div>
+                <div id="touch-btn-fire" class="touch-action-btn fire-btn">💥 FIRE</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Scripts -->
+    <script src="js/audio.js?v=18"></script>
+    <script src="js/vfx.js?v=18"></script>
+    <script src="js/weapon.js?v=18"></script>
+    <script src="js/stickman.js?v=18"></script>
+    <script src="js/arena.js?v=18"></script>
+    <script src="js/edf_zones.js?v=18"></script>
+    <script src="js/alien.js?v=18"></script>
+    <script src="js/physics.js?v=18"></script>
+    <script src="js/ai.js?v=18"></script>
+    <script src="js/network.js?v=18"></script>
+    <script src="js/game.js?v=18"></script>
+
+    <!-- UI Controllers, Touch Handling, and Gamepad Setup -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const isTouchUser = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth <= 1024);
+
+            // Audio toggles
+            const btnAudio = document.getElementById('btn-audio');
+            const btnMusic = document.getElementById('btn-music');
+
+            btnAudio.addEventListener('click', () => {
+                if (window.soundEngine) {
+                    const muted = window.soundEngine.toggleMute();
+                    btnAudio.innerText = muted ? '🔇 SFX' : '🔊 SFX';
+                }
+            });
+
+            btnMusic.addEventListener('click', () => {
+                if (window.soundEngine) {
+                    const muted = window.soundEngine.toggleMusic();
+                    btnMusic.innerText = muted ? '🔇 Musik' : '🎵 Musik';
+                }
+            });
+
+            // Fullscreen toggle
+            const btnFullscreen = document.getElementById('btn-fullscreen');
+            btnFullscreen.addEventListener('click', () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(() => {});
+                } else {
+                    document.exitFullscreen().catch(() => {});
+                }
+            });
+
+            // Mobile Orientation Check
+            const orientationBanner = document.getElementById('orientation-banner');
+            const checkOrientation = () => {
+                if (isTouchUser && window.innerHeight > window.innerWidth) {
+                    orientationBanner.style.display = 'block';
+                } else {
+                    orientationBanner.style.display = 'none';
+                }
+            };
+            window.addEventListener('resize', checkOrientation);
+            window.addEventListener('orientationchange', checkOrientation);
+            checkOrientation();
+
+            // Mobile Touch Controls Visibility
+            const btnTouch = document.getElementById('btn-touch-toggle');
+            const touchControls = document.getElementById('touch-controls');
+            const promptTitle = document.getElementById('prompt-title');
+            const promptPcDesc = document.getElementById('prompt-pc-desc');
+            const promptMobileDesc = document.getElementById('prompt-mobile-desc');
+
+            if (isTouchUser) {
+                touchControls.style.display = 'block';
+                btnTouch.classList.add('active');
+                if (promptTitle) promptTitle.innerText = "👆 SENTUH LAYAR UNTUK MULAI";
+                if (promptPcDesc) promptPcDesc.style.display = 'none';
+                if (promptMobileDesc) promptMobileDesc.style.display = 'block';
+            }
+
+            btnTouch.addEventListener('click', () => {
+                const hidden = (touchControls.style.display === 'none' || !touchControls.style.display);
+                touchControls.style.display = hidden ? 'block' : 'none';
+                btnTouch.classList.toggle('active', hidden);
+            });
+
+            // Gamepad Guide Modal
+            const gamepadBadge = document.getElementById('gamepad-badge-status');
+            const gamepadModal = document.getElementById('gamepad-guide-modal');
+            const btnCloseGamepad = document.getElementById('btn-close-gamepad-guide');
+
+            gamepadBadge.addEventListener('click', () => {
+                gamepadModal.style.display = 'flex';
+                if (document.pointerLockElement) document.exitPointerLock();
+            });
+
+            btnCloseGamepad.addEventListener('click', () => {
+                gamepadModal.style.display = 'none';
+            });
+
+            // Start / Main Menu Screen Elements (Identical to stickken)
+            const startScreen = document.getElementById('start-screen');
+            const btnStartFight = document.getElementById('btn-start-fight');
+            const selectMode = document.getElementById('select-mode');
+            const selectDifficulty = document.getElementById('select-difficulty');
+            const selectWeapon = document.getElementById('select-weapon');
+            const hostSelectWeapon = document.getElementById('host-select-weapon');
+            const groupDifficulty = document.getElementById('group-difficulty');
+            const groupWeapon = document.getElementById('group-weapon');
+            const selectArena = document.getElementById('select-arena');
+            const btnMenu = document.getElementById('btn-menu');
+
+            // Synchronize weapon selectors between menu and online host panel
+            if (selectWeapon) {
+                selectWeapon.addEventListener('change', () => {
+                    if (window.game) {
+                        window.game.setWeaponMode(selectWeapon.value);
+                    }
+                    if (hostSelectWeapon) {
+                        hostSelectWeapon.value = selectWeapon.value;
+                    }
+                });
+            }
+
+            if (hostSelectWeapon) {
+                hostSelectWeapon.addEventListener('change', () => {
+                    if (window.game) {
+                        window.game.setWeaponMode(hostSelectWeapon.value);
+                    }
+                    if (selectWeapon) {
+                        selectWeapon.value = hostSelectWeapon.value;
+                    }
+                });
+            }
+
+            // Mouse Sensitivity Controls (PC / Desktop)
+            const selectMouseSens = document.getElementById('select-mouse-sens');
+            const mouseSensDisplay = document.getElementById('mouse-sens-display');
+            const promptMouseSens = document.getElementById('prompt-mouse-sens');
+            const promptSensDisplay = document.getElementById('prompt-sens-display');
+
+            const onSensChange = (newVal) => {
+                const val = parseFloat(newVal) || 1.0;
+                if (window.game) {
+                    window.game.setMouseSensitivity(val);
+                }
+                const formatted = `${val.toFixed(1)}x`;
+                if (mouseSensDisplay) mouseSensDisplay.innerText = formatted;
+                if (promptSensDisplay) promptSensDisplay.innerText = formatted;
+                if (selectMouseSens && parseFloat(selectMouseSens.value) !== val) {
+                    selectMouseSens.value = val.toFixed(1);
+                }
+                if (promptMouseSens && parseFloat(promptMouseSens.value) !== val) {
+                    promptMouseSens.value = val.toFixed(1);
+                }
+            };
+
+            if (selectMouseSens) {
+                selectMouseSens.addEventListener('input', (e) => onSensChange(e.target.value));
+            }
+
+            if (promptMouseSens) {
+                promptMouseSens.addEventListener('input', (e) => onSensChange(e.target.value));
+                // Prevent pointer lock click propagation when interacting with sensitivity slider
+                ['click', 'mousedown', 'mouseup', 'touchstart', 'touchend'].forEach(evt => {
+                    promptMouseSens.addEventListener(evt, (e) => e.stopPropagation());
+                });
+            }
+
+            // Load saved sensitivity preference
+            try {
+                const saved = localStorage.getItem('stickenade_mouse_sens');
+                if (saved !== null) {
+                    onSensChange(saved);
+                }
+            } catch (_) {}
+
+            // Player Nickname Management (Menu & Online Lobby)
+            const inputPlayerName = document.getElementById('input-player-name');
+            const inputLobbyPlayerName = document.getElementById('input-lobby-player-name');
+            const btnSaveNickname = document.getElementById('btn-save-nickname');
+            const scoreHeroName = document.getElementById('score-hero-name');
+
+            let currentNickname = 'HERO';
+            try {
+                const saved = localStorage.getItem('stick_player_name');
+                if (saved && saved.trim()) currentNickname = saved.trim().slice(0, 15);
+            } catch (_) {}
+
+            const applyNickname = (rawName, showFeedback = false) => {
+                const clean = (rawName || '').trim().slice(0, 15) || 'HERO';
+                currentNickname = clean;
+                try {
+                    localStorage.setItem('stick_player_name', clean);
+                } catch (_) {}
+
+                if (inputPlayerName && inputPlayerName.value !== clean) {
+                    inputPlayerName.value = clean;
+                }
+                if (inputLobbyPlayerName && inputLobbyPlayerName.value !== clean) {
+                    inputLobbyPlayerName.value = clean;
+                }
+                if (scoreHeroName) {
+                    scoreHeroName.innerText = `${clean} (KAMU)`;
+                }
+
+                if (window.game && window.game.setLocalPlayerName) {
+                    window.game.setLocalPlayerName(clean);
+                }
+                if (window.networkEngine && window.networkEngine.setPlayerName) {
+                    window.networkEngine.setPlayerName(clean);
+                }
+
+                if (showFeedback && btnSaveNickname) {
+                    const origText = btnSaveNickname.textContent;
+                    btnSaveNickname.textContent = '✓ TERSIMPAN';
+                    btnSaveNickname.style.background = '#00ff88';
+                    setTimeout(() => {
+                        btnSaveNickname.textContent = origText;
+                        btnSaveNickname.style.background = '#00f0ff';
+                    }, 1200);
+                }
+            };
+
+            // Initialize inputs and scoreboard with saved nickname
+            applyNickname(currentNickname);
+
+            if (inputPlayerName) {
+                inputPlayerName.addEventListener('change', (e) => applyNickname(e.target.value));
+                inputPlayerName.addEventListener('blur', (e) => applyNickname(e.target.value));
+                inputPlayerName.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        applyNickname(e.target.value);
+                        inputPlayerName.blur();
+                    }
+                });
+            }
+
+            if (inputLobbyPlayerName) {
+                inputLobbyPlayerName.addEventListener('change', (e) => applyNickname(e.target.value));
+                inputLobbyPlayerName.addEventListener('blur', (e) => applyNickname(e.target.value));
+                inputLobbyPlayerName.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        applyNickname(e.target.value, true);
+                        inputLobbyPlayerName.blur();
+                    }
+                });
+            }
+
+            if (btnSaveNickname) {
+                btnSaveNickname.addEventListener('click', () => {
+                    const val = inputLobbyPlayerName ? inputLobbyPlayerName.value : currentNickname;
+                    applyNickname(val, true);
+                });
+            }
+
+            // Controls Tabs Switcher in Start Screen
+            const tabKeyboard = document.getElementById('tab-keyboard');
+            const tabGamepad = document.getElementById('tab-gamepad');
+            const tabTouch = document.getElementById('tab-touch');
+            const paneKeyboard = document.getElementById('guide-pane-keyboard');
+            const paneGamepad = document.getElementById('guide-pane-gamepad');
+            const paneTouch = document.getElementById('guide-pane-touch');
+
+            const switchGuideTab = (activeTab, activePane) => {
+                [tabKeyboard, tabGamepad, tabTouch].forEach(t => t.classList.remove('active'));
+                [paneKeyboard, paneGamepad, paneTouch].forEach(p => p.classList.remove('active'));
+                activeTab.classList.add('active');
+                activePane.classList.add('active');
+            };
+
+            tabKeyboard.addEventListener('click', () => switchGuideTab(tabKeyboard, paneKeyboard));
+            tabGamepad.addEventListener('click', () => switchGuideTab(tabGamepad, paneGamepad));
+            tabTouch.addEventListener('click', () => switchGuideTab(tabTouch, paneTouch));
+
+            // Synchronize Main Menu UI when Game Mode changes
+            const edfModeBanner = document.getElementById('edf-mode-banner');
+            const matchRulesBanner = document.querySelector('.match-rules-banner');
+
+            const onModeChange = () => {
+                const val = selectMode.value;
+                if (val === 'EDF_SOLO') {
+                    if (groupDifficulty) groupDifficulty.style.display = 'none';
+                    if (groupWeapon) groupWeapon.style.display = 'none';
+                    if (edfModeBanner) edfModeBanner.style.display = 'block';
+                    if (btnStartFight) {
+                        btnStartFight.innerText = 'MULAI MISI EDF (20 WAVE)';
+                        btnStartFight.style.background = 'linear-gradient(135deg, #ffaa00, #ff5500)';
+                        btnStartFight.style.color = '#000';
+                    }
+                    if (matchRulesBanner) {
+                        matchRulesBanner.innerHTML = '🐜 <strong>Format EDF Co-op:</strong> Bertahan dari 20 Wave Invasi Alien • 1000 HP • Area Med-Bay (+50 HP/s) • Depot Amunisi Buka Tiap 2 Menit!';
+                    }
+                } else if (val === 'ONLINE_EDF') {
+                    if (groupDifficulty) groupDifficulty.style.display = 'none';
+                    if (groupWeapon) groupWeapon.style.display = 'none';
+                    if (edfModeBanner) edfModeBanner.style.display = 'block';
+                    if (btnStartFight) {
+                        btnStartFight.innerText = 'BUKA LOBBY EDF CO-OP';
+                        btnStartFight.style.background = 'linear-gradient(135deg, #ffaa00, #ff5500)';
+                        btnStartFight.style.color = '#000';
+                    }
+                    openOnlineModal('EDF');
+                } else if (val === 'ONLINE_PVP') {
+                    if (groupDifficulty) groupDifficulty.style.display = 'none';
+                    if (groupWeapon) groupWeapon.style.display = 'block';
+                    if (edfModeBanner) edfModeBanner.style.display = 'none';
+                    if (btnStartFight) {
+                        btnStartFight.innerText = 'BUKA LOBBY 1v1 DUEL';
+                        btnStartFight.style.background = 'linear-gradient(135deg, #00f0ff, #0077ff)';
+                        btnStartFight.style.color = '#000';
+                    }
+                    if (matchRulesBanner) {
+                        matchRulesBanner.innerHTML = '⏱️ <strong>Format Pertandingan:</strong> 3 Menit Eliminasi • Skor Terbanyak Menang • ⚠️ <em>Bunuh diri / granat sendiri <strong>-1 Poin</strong></em>';
+                    }
+                    openOnlineModal('PVP');
+                } else {
+                    // DUEL_AI
+                    if (groupDifficulty) groupDifficulty.style.display = 'block';
+                    if (groupWeapon) groupWeapon.style.display = 'block';
+                    if (edfModeBanner) edfModeBanner.style.display = 'none';
+                    if (btnStartFight) {
+                        btnStartFight.innerText = 'START BATTLE';
+                        btnStartFight.style.background = 'linear-gradient(135deg, #00f0ff, #0077ff)';
+                        btnStartFight.style.color = '#000';
+                    }
+                    if (matchRulesBanner) {
+                        matchRulesBanner.innerHTML = '⏱️ <strong>Format Pertandingan:</strong> 3 Menit Eliminasi • Skor Terbanyak Menang • ⚠️ <em>Bunuh diri / granat sendiri <strong>-1 Poin</strong></em>';
+                    }
+                }
+            };
+
+            selectMode.addEventListener('change', onModeChange);
+            onModeChange();
+
+            // Start Battle Button in Main Menu
+            btnStartFight.addEventListener('click', () => {
+                if (selectMode.value === 'ONLINE_PVP') {
+                    openOnlineModal('PVP');
+                } else if (selectMode.value === 'ONLINE_EDF') {
+                    openOnlineModal('EDF');
+                } else if (selectMode.value === 'EDF_SOLO') {
+                    startScreen.style.display = 'none';
+                    if (window.game) {
+                        window.game.startMatch('EDF_SOLO');
+                    }
+                } else {
+                    startScreen.style.display = 'none';
+                    if (window.game) {
+                        const chosenWeapon = selectWeapon ? selectWeapon.value : 'GRENADE';
+                        window.game.startMatch('BOT', selectDifficulty.value, chosenWeapon);
+                    }
+                }
+            });
+
+            // Top Action: Open Main Menu
+            btnMenu.addEventListener('click', () => {
+                if (document.pointerLockElement) document.exitPointerLock();
+                if (window.game) window.game.isPaused = true;
+                startScreen.style.display = 'flex';
+                modalLobby.style.display = 'none';
+            });
+
+            // Online 1v1 Lobby Modal Elements (Identical to stickken)
+            const btnLobby = document.getElementById('btn-lobby');
+            const modalLobby = document.getElementById('lobby-modal');
+            const btnCloseLobby = document.getElementById('btn-close-lobby');
+            const btnTabHost = document.getElementById('btn-tab-host');
+            const btnTabJoin = document.getElementById('btn-tab-join');
+            const panelHost = document.getElementById('panel-host');
+            const panelJoin = document.getElementById('panel-join');
+            const hostRoomCode = document.getElementById('host-room-code');
+            const hostStatusMsg = document.getElementById('host-status-msg');
+            const btnCopyRoomLink = document.getElementById('btn-copy-room-link');
+            const inputRoomCode = document.getElementById('input-room-code');
+            const btnSubmitJoin = document.getElementById('btn-submit-join');
+            const joinStatusPulse = document.getElementById('join-status-pulse');
+            const joinStatusMsg = document.getElementById('join-status-msg');
+
+            const toggleServerSettings = document.getElementById('toggle-server-settings');
+            const serverSettingsPanel = document.getElementById('server-settings-panel');
+            const currentServerLabel = document.getElementById('current-server-label');
+            const inputCustomServer = document.getElementById('input-custom-server');
+            const inputCustomPath = document.getElementById('input-custom-path');
+            const btnSaveServer = document.getElementById('btn-save-server');
+            const btnResetServer = document.getElementById('btn-reset-server');
+
+            function updateServerUI() {
+                if (!window.networkEngine) return;
+                const cfg = window.networkEngine.serverConfig;
+                if (currentServerLabel) {
+                    currentServerLabel.textContent = cfg.host ? `${cfg.host}${cfg.path !== '/' ? cfg.path : ''}` : '0.peerjs.com';
+                }
+                if (inputCustomServer && cfg.host) {
+                    inputCustomServer.value = cfg.host;
+                }
+                if (inputCustomPath && cfg.path) {
+                    inputCustomPath.value = cfg.path;
+                }
+            }
+
+            if (toggleServerSettings && serverSettingsPanel) {
+                toggleServerSettings.addEventListener('click', () => {
+                    const isOpen = serverSettingsPanel.style.display !== 'none';
+                    serverSettingsPanel.style.display = isOpen ? 'none' : 'block';
+                });
+            }
+
+            if (btnSaveServer) {
+                btnSaveServer.addEventListener('click', () => {
+                    const rawUrl = inputCustomServer.value.trim();
+                    const rawPath = inputCustomPath.value.trim() || '/stickenade';
+                    if (!rawUrl) {
+                        alert('Silakan masukkan URL atau domain Cloudflare / Render kamu!');
+                        return;
+                    }
+                    // Strip https://, http://, and trailing slashes
+                    let host = rawUrl.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
+                    const path = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+
+                    if (window.networkEngine) {
+                        window.networkEngine.setServer(host, 443, path, true);
+                        updateServerUI();
+                    }
+                    if (serverSettingsPanel) serverSettingsPanel.style.display = 'none';
+
+                    // If currently hosting, restart room on new server
+                    if (panelHost.classList.contains('active') && window.networkEngine) {
+                        window.networkEngine.disconnect();
+                        startHosting();
+                    }
+                });
+            }
+
+            if (btnResetServer) {
+                btnResetServer.addEventListener('click', () => {
+                    if (window.networkEngine) {
+                        window.networkEngine.setServer('stickenade-peerserver.onrender.com', 443, '/stickenade', true);
+                        updateServerUI();
+                    }
+                    if (inputCustomServer) inputCustomServer.value = 'stickenade-peerserver.onrender.com';
+                    if (inputCustomPath) inputCustomPath.value = '/stickenade';
+                    if (serverSettingsPanel) serverSettingsPanel.style.display = 'none';
+
+                    if (panelHost.classList.contains('active') && window.networkEngine) {
+                        window.networkEngine.disconnect();
+                        startHosting();
+                    }
+                });
+            }
+
+            const hostSelectGameType = document.getElementById('host-select-gametype');
+            const groupHostWeapon = document.getElementById('group-host-weapon');
+            const hostEdfInfoBanner = document.getElementById('host-edf-info-banner');
+
+            function syncHostGameTypeUI() {
+                if (!hostSelectGameType) return;
+                const isEDF = hostSelectGameType.value === 'EDF';
+                if (groupHostWeapon) groupHostWeapon.style.display = isEDF ? 'none' : 'block';
+                if (hostEdfInfoBanner) hostEdfInfoBanner.style.display = isEDF ? 'block' : 'none';
+            }
+
+            if (hostSelectGameType) {
+                hostSelectGameType.addEventListener('change', syncHostGameTypeUI);
+            }
+
+            function openOnlineModal(preferredType = 'EDF') {
+                modalLobby.style.display = 'flex';
+                if (document.pointerLockElement) document.exitPointerLock();
+
+                if (inputLobbyPlayerName) {
+                    inputLobbyPlayerName.value = currentNickname;
+                }
+
+                if (hostSelectGameType) {
+                    hostSelectGameType.value = preferredType;
+                    syncHostGameTypeUI();
+                }
+
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.has('server') && window.networkEngine) {
+                    const srv = urlParams.get('server');
+                    const pth = urlParams.get('path') || '/stickenade';
+                    window.networkEngine.setServer(srv, 443, pth, true);
+                }
+                updateServerUI();
+
+                if (urlParams.has('room')) {
+                    const room = urlParams.get('room').toUpperCase();
+                    btnTabJoin.click();
+                    inputRoomCode.value = room;
+                    joinStatusPulse.style.display = 'flex';
+                    joinStatusMsg.textContent = `Menghubungkan ke Room ${room}...`;
+                    window.networkEngine.joinRoom(room);
+                } else {
+                    btnTabHost.click();
+                }
+            }
+
+            // Tab switching
+            btnTabHost.addEventListener('click', () => {
+                btnTabHost.classList.add('active');
+                btnTabJoin.classList.remove('active');
+                panelHost.classList.add('active');
+                panelJoin.classList.remove('active');
+                startHosting();
+            });
+
+            btnTabJoin.addEventListener('click', () => {
+                btnTabJoin.classList.add('active');
+                btnTabHost.classList.remove('active');
+                panelJoin.classList.add('active');
+                panelHost.classList.remove('active');
+            });
+
+            const hostSelectMaxPlayers = document.getElementById('host-select-max-players');
+            const hostPlayerSlots = document.getElementById('host-player-slots');
+            const joinPlayerSlots = document.getElementById('join-player-slots');
+            const btnHostStartMatch = document.getElementById('btn-host-start-match');
+            const hostReadyCount = document.getElementById('host-ready-count');
+            const hostMaxCount = document.getElementById('host-max-count');
+
+            const SLOT_COLORS_HEX = {
+                1: '#00f0ff',
+                2: '#f97316',
+                3: '#22c55e',
+                4: '#d946ef'
+            };
+
+            function renderPlayerSlots(container, players) {
+                if (!container || !players) return;
+                container.style.display = 'flex';
+                container.innerHTML = players.map(p => {
+                    const color = SLOT_COLORS_HEX[p.slot] || '#fff';
+                    const isConnected = p.connected;
+                    return `
+                        <div class="player-slot-item ${isConnected ? 'connected' : 'waiting'}" style="border-left: 3px solid ${isConnected ? color : '#444'};">
+                            <span class="slot-tag">
+                                <span class="slot-color-dot" style="background: ${color}; color: ${color};"></span>
+                                <span style="color: ${isConnected ? '#fff' : '#888'}">${p.name}${p.isMe ? ' (Kamu)' : ''}</span>
+                            </span>
+                            <span class="slot-status-badge ${isConnected ? 'ready' : 'waiting'}">
+                                ${isConnected ? (p.isHost ? '👑 HOST' : '✓ SIAP') : 'MENUNGGU...'}
+                            </span>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            function startHosting() {
+                if (window.soundEngine && !window.soundEngine.initialized) window.soundEngine.init();
+                const maxP = hostSelectMaxPlayers ? (parseInt(hostSelectMaxPlayers.value) || 2) : 2;
+                if (window.networkEngine) {
+                    if (!window.networkEngine.isConnected || !window.networkEngine.isHost) {
+                        hostRoomCode.textContent = "MEMBUAT...";
+                        hostStatusMsg.textContent = "Menghubungkan ke Peer Server...";
+                        window.networkEngine.createRoom(null, maxP);
+                    } else {
+                        window.networkEngine.setMaxPlayers(maxP);
+                    }
+                }
+            }
+
+            if (hostSelectMaxPlayers) {
+                hostSelectMaxPlayers.addEventListener('change', () => {
+                    if (window.networkEngine && window.networkEngine.isHost) {
+                        window.networkEngine.setMaxPlayers(hostSelectMaxPlayers.value);
+                    }
+                });
+            }
+
+            if (btnHostStartMatch) {
+                btnHostStartMatch.addEventListener('click', () => {
+                    const isEDF = hostSelectGameType && hostSelectGameType.value === 'EDF';
+                    const chosenWeapon = isEDF ? 'EDF_COOP' : (hostSelectWeapon ? hostSelectWeapon.value : 'GRENADE');
+                    const gameType = isEDF ? 'EDF' : 'PVP';
+                    if (window.networkEngine && window.networkEngine.isHost) {
+                        window.networkEngine.startHostMatch(chosenWeapon, 180, gameType);
+                    }
+                });
+            }
+
+            // Hook Network Status & Player List updates to Lobby Modal
+            if (window.networkEngine) {
+                window.networkEngine.onStatusChange = (info) => {
+                    if (info.isHost) {
+                        hostRoomCode.textContent = info.code || '----';
+                        hostStatusMsg.textContent = info.text || 'Menunggu pemain...';
+                    } else {
+                        joinStatusPulse.style.display = 'flex';
+                        joinStatusMsg.textContent = info.text || 'Menghubungkan...';
+                    }
+                };
+
+                window.networkEngine.onPlayerListUpdate = (players) => {
+                    renderPlayerSlots(hostPlayerSlots, players);
+                    renderPlayerSlots(joinPlayerSlots, players);
+
+                    if (window.game && window.game.syncPlayerNames) {
+                        window.game.syncPlayerNames(players);
+                    }
+
+                    const connectedCount = players.filter(p => p.connected).length;
+                    const totalMax = window.networkEngine.maxPlayers || players.length;
+
+                    if (hostReadyCount) hostReadyCount.textContent = connectedCount;
+                    if (hostMaxCount) hostMaxCount.textContent = totalMax;
+
+                    if (btnHostStartMatch) {
+                        if (window.networkEngine.isHost && connectedCount >= 2) {
+                            btnHostStartMatch.style.display = 'block';
+                        } else {
+                            btnHostStartMatch.style.display = 'none';
+                        }
+                    }
+                };
+            }
+
+            btnLobby.addEventListener('click', () => {
+                selectMode.value = 'ONLINE_PVP';
+                if (groupDifficulty) groupDifficulty.style.display = 'none';
+                openOnlineModal();
+            });
+
+            btnCloseLobby.addEventListener('click', () => {
+                modalLobby.style.display = 'none';
+                selectMode.value = 'DUEL_AI';
+                if (groupDifficulty) groupDifficulty.style.display = 'block';
+                startScreen.style.display = 'flex';
+                if (window.networkEngine) window.networkEngine.disconnect();
+            });
+
+            // Copy Shareable Room Link (Embeds custom Cloudflare/Glitch server param if configured)
+            btnCopyRoomLink.addEventListener('click', () => {
+                const code = window.networkEngine.roomCode;
+                if (!code) return;
+                let link = `${window.location.origin}${window.location.pathname}?room=${code}`;
+                if (window.networkEngine && window.networkEngine.serverConfig && window.networkEngine.serverConfig.host) {
+                    link += `&server=${encodeURIComponent(window.networkEngine.serverConfig.host)}`;
+                    if (window.networkEngine.serverConfig.path && window.networkEngine.serverConfig.path !== '/') {
+                        link += `&path=${encodeURIComponent(window.networkEngine.serverConfig.path)}`;
+                    }
+                }
+                navigator.clipboard.writeText(link).then(() => {
+                    const orig = btnCopyRoomLink.textContent;
+                    btnCopyRoomLink.textContent = '✅ LINK TERSALIN!';
+                    setTimeout(() => btnCopyRoomLink.textContent = orig, 2000);
+                }).catch(() => {
+                    prompt('Salin link room ini dan kirim ke temanmu:', link);
+                });
+            });
+
+            // Join Room Click
+            btnSubmitJoin.addEventListener('click', () => {
+                const code = inputRoomCode.value.trim();
+                if (!code) {
+                    alert('Masukkan Kode Room terlebih dahulu!');
+                    return;
+                }
+                if (window.soundEngine && !window.soundEngine.initialized) window.soundEngine.init();
+                joinStatusPulse.style.display = 'flex';
+                joinStatusMsg.textContent = `Menghubungkan ke Room ${code}...`;
+                window.networkEngine.joinRoom(code);
+            });
+
+            // Rematch & Back to Menu buttons
+            const btnRematch = document.getElementById('btn-rematch');
+            btnRematch.addEventListener('click', () => {
+                if (window.game) window.game.restartMatch();
+            });
+
+            const btnBackToMenu = document.getElementById('btn-back-to-menu');
+            if (btnBackToMenu) {
+                btnBackToMenu.addEventListener('click', () => {
+                    const goModal = document.getElementById('game-over-modal');
+                    if (goModal) goModal.style.display = 'none';
+                    if (window.game) {
+                        window.game.isPaused = true;
+                        window.game.isGameOver = false;
+                        window.game.isEDFMode = false;
+                        if (window.game.alienManager) window.game.alienManager.reset();
+                        window.game.mode = 'BOT';
+                        window.game.updateOnlineHUD();
+                        const edfHud = document.getElementById('edf-wave-hud');
+                        if (edfHud) edfHud.style.display = 'none';
+                        const loadoutBar = document.getElementById('edf-loadout-bar');
+                        if (loadoutBar) loadoutBar.style.display = 'none';
+                        const sb = document.getElementById('top-scoreboard');
+                        if (sb) sb.style.display = 'flex';
+                    }
+                    if (window.networkEngine) {
+                        window.networkEngine.disconnect();
+                    }
+                    startScreen.style.display = 'flex';
+                });
+            }
+
+            // 1-Click Auto-Join via URL parameter (?room=XXXX) like stickken
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('room')) {
+                const room = urlParams.get('room').toUpperCase();
+                modalLobby.style.display = 'flex';
+                btnTabJoin.click();
+                inputRoomCode.value = room;
+                joinStatusPulse.style.display = 'flex';
+                joinStatusMsg.textContent = `Menghubungkan ke Room ${room}...`;
+                setTimeout(() => {
+                    if (window.soundEngine && !window.soundEngine.initialized) window.soundEngine.init();
+                    window.networkEngine.joinRoom(room);
+                }, 400);
+            }
+
+            // Quick Auto-start via URL parameter (?autostart=sniper or ?autostart=grenade)
+            if (urlParams.has('autostart')) {
+                const requestedWep = (urlParams.get('autostart') === 'sniper' || urlParams.get('autostart') === 'SNIPER') ? 'SNIPER' : 'GRENADE';
+                startScreen.style.display = 'none';
+                setTimeout(() => {
+                    if (window.game) {
+                        window.game.startMatch('BOT', 'normal', requestedWep);
+                        const lockPrompt = document.getElementById('pointer-lock-prompt');
+                        if (lockPrompt) lockPrompt.style.display = 'none';
+                    }
+                }, 200);
+            }
+
+            // ===============================================
+            // COMPREHENSIVE MOBILE TOUCH CONTROLS LOGIC
+            // ===============================================
+            window.touchMoveVector = { x: 0, y: 0 };
+            window.touchJumpTriggered = false;
+            window.touchFireActive = false;
+            window.touchCrouchActive = false;
+            window.touchSprintActive = false;
+
+            // 1. Dedicated Touch Look / Aim Surface on Right Side
+            const lookZone = document.getElementById('touch-look-zone');
+            let lookTouchId = null;
+            let lastLookX = 0;
+            let lastLookY = 0;
+            const touchLookSensitivity = 0.0042;
+
+            lookZone.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (window.soundEngine && !window.soundEngine.initialized) window.soundEngine.init();
+                const touch = e.changedTouches[0];
+                lookTouchId = touch.identifier;
+                lastLookX = touch.clientX;
+                lastLookY = touch.clientY;
+            }, { passive: false });
+
+            lookZone.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touch = e.changedTouches[i];
+                    if (touch.identifier === lookTouchId) {
+                        const dX = touch.clientX - lastLookX;
+                        const dY = touch.clientY - lastLookY;
+
+                        if (window.game && window.game.player && !window.game.player.isDead) {
+                            let touchSens = touchLookSensitivity;
+                            if (window.game.weapon && window.game.weapon.isADS) {
+                                touchSens *= (window.game.weaponMode === 'SNIPER' ? 0.35 : 0.65);
+                            }
+                            window.game.player.yaw -= dX * touchSens;
+                            window.game.player.pitch -= dY * touchSens;
+
+                            const maxPitch = Math.PI * 0.48;
+                            window.game.player.pitch = Math.max(-maxPitch, Math.min(maxPitch, window.game.player.pitch));
+                        }
+
+                        lastLookX = touch.clientX;
+                        lastLookY = touch.clientY;
+                        break;
+                    }
+                }
+            }, { passive: false });
+
+            const resetLookTouch = (e) => {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === lookTouchId) {
+                        lookTouchId = null;
+                        break;
+                    }
+                }
+            };
+            lookZone.addEventListener('touchend', resetLookTouch);
+            lookZone.addEventListener('touchcancel', resetLookTouch);
+
+            // 2. Dynamic Floating Virtual Joystick on Left Side (PUBG / MLBB Style)
+            const moveSurface = document.getElementById('touch-move-surface');
+            const moveZone = document.getElementById('touch-move-zone');
+            const moveKnob = document.getElementById('touch-move-knob');
+            let moveTouchId = null;
+            let moveStartX = 0, moveStartY = 0;
+            let joystickResetTimeout = null;
+
+            moveSurface.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (window.soundEngine && !window.soundEngine.initialized) window.soundEngine.init();
+
+                // Only track the primary movement finger on the left
+                if (moveTouchId !== null) return;
+
+                const touch = e.changedTouches[0];
+                moveTouchId = touch.identifier;
+
+                if (joystickResetTimeout) {
+                    clearTimeout(joystickResetTimeout);
+                    joystickResetTimeout = null;
+                }
+                moveZone.classList.remove('resetting');
+                moveZone.classList.add('active');
+
+                // Dynamic Center: place joystick base directly under player thumb
+                moveStartX = touch.clientX;
+                moveStartY = touch.clientY;
+
+                const halfBase = (moveZone.offsetWidth / 2) || 65;
+                moveZone.style.left = `${moveStartX - halfBase}px`;
+                moveZone.style.top = `${moveStartY - halfBase}px`;
+                moveZone.style.bottom = 'auto';
+
+                // Center knob initially
+                moveKnob.style.transform = 'translate(-50%, -50%)';
+                window.touchMoveVector.x = 0;
+                window.touchMoveVector.y = 0;
+            }, { passive: false });
+
+            moveSurface.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touch = e.changedTouches[i];
+                    if (touch.identifier === moveTouchId) {
+                        handleJoystickMove(touch.clientX, touch.clientY);
+                        break;
+                    }
+                }
+            }, { passive: false });
+
+            const resetJoystick = (e) => {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === moveTouchId) {
+                        moveTouchId = null;
+                        window.touchMoveVector.x = 0;
+                        window.touchMoveVector.y = 0;
+
+                        // Center knob
+                        moveKnob.style.transform = 'translate(-50%, -50%)';
+
+                        // Smoothly transition base back to idle resting corner
+                        moveZone.classList.remove('active');
+                        moveZone.classList.add('resetting');
+                        moveZone.style.left = '';
+                        moveZone.style.top = '';
+                        moveZone.style.bottom = '';
+
+                        joystickResetTimeout = setTimeout(() => {
+                            moveZone.classList.remove('resetting');
+                            joystickResetTimeout = null;
+                        }, 240);
+                        break;
+                    }
+                }
+            };
+            moveSurface.addEventListener('touchend', resetJoystick);
+            moveSurface.addEventListener('touchcancel', resetJoystick);
+
+            function handleJoystickMove(cx, cy) {
+                const halfBase = (moveZone.offsetWidth / 2) || 65;
+                const maxRadius = Math.round(halfBase * 0.72); // ~47px radius
+
+                let dx = cx - moveStartX;
+                let dy = cy - moveStartY;
+                const dist = Math.hypot(dx, dy);
+
+                if (dist > maxRadius) {
+                    // Following / Trailing Base Anchor (Standard PUBG Mobile & Mobile Legends)
+                    // If thumb drags beyond maxRadius, smoothly pull base along with thumb!
+                    const excess = dist - maxRadius;
+                    const angle = Math.atan2(dy, dx);
+                    moveStartX += Math.cos(angle) * excess;
+                    moveStartY += Math.sin(angle) * excess;
+
+                    moveZone.style.left = `${moveStartX - halfBase}px`;
+                    moveZone.style.top = `${moveStartY - halfBase}px`;
+
+                    dx = Math.cos(angle) * maxRadius;
+                    dy = Math.sin(angle) * maxRadius;
+                }
+
+                moveKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                window.touchMoveVector.x = Math.max(-1, Math.min(1, dx / maxRadius));
+                window.touchMoveVector.y = Math.max(-1, Math.min(1, -dy / maxRadius));
+            }
+
+            // 3. Ergonomic Touch Action Buttons with Haptics
+            const bindTouchBtn = (el, onDown, onUp) => {
+                if (!el) return;
+                el.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    el.classList.add('touch-active');
+                    if (window.soundEngine && !window.soundEngine.initialized) window.soundEngine.init();
+                    if (navigator.vibrate) navigator.vibrate(20);
+                    if (onDown) onDown();
+                }, { passive: false });
+
+                el.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    el.classList.remove('touch-active');
+                    if (onUp) onUp();
+                }, { passive: false });
+
+                el.addEventListener('touchcancel', (e) => {
+                    el.classList.remove('touch-active');
+                    if (onUp) onUp();
+                });
+            };
+
+            // Fire Button
+            const btnFire = document.getElementById('touch-btn-fire');
+            bindTouchBtn(btnFire, () => {
+                window.touchFireActive = true;
+            }, () => {
+                window.touchFireActive = false;
+            });
+
+            // Jump Button
+            const btnJump = document.getElementById('touch-btn-jump');
+            bindTouchBtn(btnJump, () => {
+                window.touchJumpTriggered = true;
+            }, () => {});
+
+            // ADS Button (Toggle)
+            const btnAds = document.getElementById('touch-btn-ads');
+            btnAds.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (window.game && window.game.weapon) {
+                    const isAds = !window.game.weapon.isADS;
+                    window.game.weapon.setADS(isAds);
+                    btnAds.classList.toggle('ads-active', isAds);
+                    if (navigator.vibrate) navigator.vibrate(15);
+                }
+            }, { passive: false });
+
+            // Reload Button
+            const btnReload = document.getElementById('touch-btn-reload');
+            bindTouchBtn(btnReload, () => {
+                if (window.game && window.game.weapon) {
+                    window.game.weapon.startReload();
+                }
+            });
+
+            // Crouch Button (Toggle)
+            const btnCrouch = document.getElementById('touch-btn-crouch');
+            btnCrouch.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                window.touchCrouchActive = !window.touchCrouchActive;
+                btnCrouch.classList.toggle('ads-active', window.touchCrouchActive);
+                if (navigator.vibrate) navigator.vibrate(15);
+            }, { passive: false });
+
+            // Sprint Button (Toggle)
+            const btnSprint = document.getElementById('touch-btn-sprint');
+            btnSprint.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                window.touchSprintActive = !window.touchSprintActive;
+                btnSprint.classList.toggle('ads-active', window.touchSprintActive);
+                if (navigator.vibrate) navigator.vibrate(15);
+            }, { passive: false });
+        });
+    </script>
+</body>
+</html>
